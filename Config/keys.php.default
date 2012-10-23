@@ -1,0 +1,26 @@
+<?php
+
+$config = array(
+	'Api' => array(
+		'UserName' => '****',
+		'Password' => '****',
+		'Signature' => '****',
+		'sandboxFlag' => true,
+	),
+	'App' => array(
+		'currency' => 'JPY',
+		'paymentType' => 'Sale',
+		// Review page of your app
+		'review' => array(
+			'controller' => 'payments',
+			'action' => 'review',
+			'plugin' => null,
+		),
+		// Finish page of your app
+		'finish' => array(
+			'controller' => 'payments',
+			'action' => 'finish',
+			'plugin' => null,
+		),
+	),
+);
