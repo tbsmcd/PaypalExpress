@@ -87,7 +87,7 @@ class PaypalComponent extends Component {
 		return $this->paypalUrl . $token;
 	}
 
-	public function	fixCustomerData($data) {
+	public function	fixCustomerData($data, $token) {
 		$customer = array(
 			'token' => $token,
 			'name' => $data['SHIPTONAME'],
