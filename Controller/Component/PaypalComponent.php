@@ -14,10 +14,12 @@ class PaypalComponent extends Component {
 		$this->returnUrl = Router::url(array(
 			'controller' => 'checkouts',
 			'action' => 'review',
+			'plugin' => 'paypal_express',
 		), true);
 		$this->cancelUrl = Router::url(array(
 			'controller' => 'checkouts',
 			'action' => 'cancel',
+			'plugin' => 'paypal_express',
 		), true);
 
 		$sandboxFlag = Configure::read('Api.sandboxFlag');
