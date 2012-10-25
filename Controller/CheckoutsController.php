@@ -22,11 +22,12 @@ class CheckoutsController extends PaypalExpressAppController {
 	}
 
 	public function review() {
-		$token = $this->request->query('token');
-		if (null === $token) {
-			$this->redirect($this->Paypal->cancelUrl);
-		} else {
+		$token = '';
+		if (isset($this->request->query['token'])) {
+			$token = $this->request->query['token'];
 			$this->Session->write('Paypal.token', $token);
+		} else {
+			$this->redirect($this->Paypal->cancelUrl);
 		}
 		$res = $this->Paypal->getShippingDetails($token);
 		$ack = strtoupper($res['ACK']);
