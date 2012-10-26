@@ -23,7 +23,7 @@ $config = array(
 			'plugin' => null,
 		),
 		// Failure page of your app
-		'review' => array(
+		'failure' => array(
 			'controller' => 'payments',
 			'action' => 'bill',
 			'plugin' => null,

@@ -3,12 +3,16 @@
 class CheckoutsController extends PaypalExpressAppController {
 	public $uses = array();
 	public $components = array('PaypalExpress.Paypal');
+	public $errorUrl;
+
+	public function beforeFilter () {
+		$this->errorUrl = Configure::read('App.error');
+	}
 
 	public function bill() {
-		// $amount = $this->request->data('Paypal.amount');
-		$amount = '1800';
+		$amount = $this->request->data('Paypal.amount');
 		if (!preg_match('/^[1-9][0-9]*$/', $amount)) {
-			// error
+			$this->redirect($this->errorUrl);
 		}
 		$this->Session->write('Paypal.amount', $amount);
 		$res = $this->Paypal->callShortcutExpressCheckout($amount);
@@ -16,8 +20,7 @@ class CheckoutsController extends PaypalExpressAppController {
 		if ($ack === 'SUCCESS' || $ack === 'SUCCESSWITHWARNING') {
 			$this->redirect($this->Paypal->redirectUrl($res['TOKEN']));
 		} else {
-			// error
-
+			$this->redirect($this->errorUrl);
 		}
 	}
 
@@ -38,6 +41,7 @@ class CheckoutsController extends PaypalExpressAppController {
 			$this->redirect($reviewPage);
 		} else {
 			$this->Session->delete('Paypal.payerId');
+			$this->redirect($this->errorUrl);
 		}
 	}
 
@@ -54,6 +58,7 @@ class CheckoutsController extends PaypalExpressAppController {
 			$this->redirect($successPage);
 		} else {
 			$this->Session->delete('Paypal.payerId');
+			$this->redirect($this->errorUrl);
 		}
 
 	}
