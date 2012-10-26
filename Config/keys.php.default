@@ -22,5 +22,11 @@ $config = array(
 			'action' => 'finish',
 			'plugin' => null,
 		),
+		// Failure page of your app
+		'review' => array(
+			'controller' => 'payments',
+			'action' => 'bill',
+			'plugin' => null,
+		),
 	),
 );
