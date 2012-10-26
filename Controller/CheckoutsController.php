@@ -6,7 +6,7 @@ class CheckoutsController extends PaypalExpressAppController {
 	public $errorUrl;
 
 	public function beforeFilter () {
-		$this->errorUrl = Configure::read('App.error');
+		$this->errorUrl = Configure::read('App.failure');
 	}
 
 	public function bill() {
