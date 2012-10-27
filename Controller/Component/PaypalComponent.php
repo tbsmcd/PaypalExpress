@@ -1,5 +1,6 @@
 <?php
 App::uses('HttpSocket', 'Network/Http');
+App::uses('SessionComponent', 'COntroller/Component');
 Configure::load('PaypalExpress.keys');
 
 class PaypalComponent extends Component {
@@ -35,6 +36,46 @@ class PaypalComponent extends Component {
 		}
 	}
 
+	public function getToken($amount = null) {
+		if (!preg_match('/^[1-9][0-9]*$/', $amount)) {
+			return false;
+		}
+		$this->Session->write('Paypal.amount', $amount);
+		$res = $this->callShortcutExpressCheckout($amount);
+		$ack = strtoupper($res['ACK']);
+		if ($ack === 'SUCCESS' || $ack === 'SUCCESSWITHWARNING') {
+			return $res['TOKEN'];
+		}
+		return false;
+	}
+
+	public function review($token = null) {
+		if (isset($token)) {
+			$this->Session->write('Paypal.token', $token);
+		} else {
+			return false;
+		}
+		$res = $this->getShippingDetails($token);
+		$ack = strtoupper($res['ACK']);
+		if ($ack === 'SUCCESS' || $ack === 'SUCCESSWITHWARNING') {
+			return $this->fixCustomerData($res, $token);
+		}
+		return false;
+	}
+
+	public function finishCheckout() {
+		$amount = $this->Session->read('Paypal.amount');
+		$payerId = $this->Session->read('Paypal.payerId');
+		$token = $this->Session->read('Paypal.token');
+		$res = $this->confirmPayment($amount, $token, $payerId);
+		$ack = strtoupper($res['ACK']);
+		if ($ack === 'SUCCESS' || $ack === 'SUCCESSWITHWARNING') {
+			$paymentResult = $this->fixPaymentResult($res, $token);
+			return $paymentresult;
+		}
+		return false;
+	}
+
 	public function callShortcutExpressCheckout ($paymentAmount) {
 		$appConf = Configure::read('App');
 		$nvp = array(
@@ -44,7 +85,6 @@ class PaypalComponent extends Component {
 			'CANCELURL' => $this->cancelUrl,
 			'PAYMENTREQUEST_0_CURRENCYCODE' => $appConf['currency'],
 		);
-
 		return $this->hashCall('setExpressCheckout', $nvp);
 	}
 
@@ -83,10 +123,6 @@ class PaypalComponent extends Component {
 		$res = $socket->post($this->apiEndpoint, $nvp);
 		parse_str($res->body, $body);
 		return $body;
-	}
-
-	public function redirectUrl($token) {
-		return $this->paypalUrl . $token;
 	}
 
 	public function	fixCustomerData($data, $token) {
