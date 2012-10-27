@@ -1,6 +1,6 @@
 <?php
 App::uses('HttpSocket', 'Network/Http');
-App::uses('SessionComponent', 'COntroller/Component');
+App::uses('SessionComponent', 'Controller/Component');
 Configure::load('PaypalExpress.keys');
 
 class PaypalComponent extends Component {
