@@ -1,30 +1,25 @@
 <?php
 App::uses('HttpSocket', 'Network/Http');
 App::uses('SessionComponent', 'Controller/Component');
-Configure::load('PaypalExpress.keys');
 
 class PaypalComponent extends Component {
 	public $apiEndpoint;
 	public $paypalUrl;
 	public $sBNCode = 'PP-ECWizard';
 	public $version = '64';
+
+	// You must set in Controller::beforFilter()
+	public $username;
+	public $password;
+	public $signature;
+	public $sandboxflag;
+	public $currency;
+	public $pymentType;
 	public $returnUrl;
 	public $cancelUrl;
 
-	public function initialize($controller) {
-		$this->returnUrl = Router::url(array(
-			'controller' => 'checkouts',
-			'action' => 'review',
-			'plugin' => 'paypal_express',
-		), true);
-		$this->cancelUrl = Router::url(array(
-			'controller' => 'checkouts',
-			'action' => 'cancel',
-			'plugin' => 'paypal_express',
-		), true);
-
-		$sandboxFlag = Configure::read('Api.sandboxFlag');
-		if ($sandboxFlag === true) {
+	public function startup($controller) {
+		if ($this->sandboxFlag === true) {
 			$this->apiEndpoint = 'https://api-3t.sandbox.paypal.com/nvp';
 			$this->paypalUrl = 'https://www.sandbox.paypal.com/webscr?cmd=_express-checkout&token=';
 		} else {
@@ -47,6 +42,10 @@ class PaypalComponent extends Component {
 			return $res['TOKEN'];
 		}
 		return false;
+	}
+
+	public function redirectToPaypal($token) {
+		$this->controller->redirect($this->paypalUrl . $token);
 	}
 
 	public function review($token = null) {
@@ -77,13 +76,12 @@ class PaypalComponent extends Component {
 	}
 
 	public function callShortcutExpressCheckout ($paymentAmount) {
-		$appConf = Configure::read('App');
 		$nvp = array(
 			'PAYMENTREQUEST_0_AMT' => $paymentAmount,
-			'PAYMENTREQUEST_0_PAYMENTACTION' => $appConf['paymentType'],
+			'PAYMENTREQUEST_0_PAYMENTACTION' => $this->paymentType,
 			'RETURNURL' => $this->returnUrl,
 			'CANCELURL' => $this->cancelUrl,
-			'PAYMENTREQUEST_0_CURRENCYCODE' => $appConf['currency'],
+			'PAYMENTREQUEST_0_CURRENCYCODE' => $this->currency,
 		);
 		return $this->hashCall('setExpressCheckout', $nvp);
 	}
@@ -100,22 +98,21 @@ class PaypalComponent extends Component {
 		$nvp = array(
 			'TOKEN' => $token,
 			'PAYERID' => $payerId,
-			'PAYMENTREQUEST_0_PAYMENTACTION' => Configure::read('App.paymentType'),
+			'PAYMENTREQUEST_0_PAYMENTACTION' => $this->paymentType,
 			'PAYMENTREQUEST_0_AMT' => $amount,
-			'PAYMENTREQUEST_0_CURRENCYCODE' => Configure::read('App.currency'),
+			'PAYMENTREQUEST_0_CURRENCYCODE' => $this->currency,
 			'IPADDRESS' => env('SERVER_NAME'),
 		);
 		return $this->hashCall('DoExpressCheckoutPayment', $nvp);
 	}
 
 	public function hashCall ($methodName, $additionalNvp) {
-		$apiConf = Configure::read('Api');
 		$nvp = array(
 			'METHOD' => $methodName,
 			'VERSION' => $this->version,
-			'PWD' => $apiConf['Password'],
-			'USER' => $apiConf['UserName'],
-			'SIGNATURE' => $apiConf['Signature'],
+			'PWD' => $this->password,
+			'USER' => $this->username,
+			'SIGNATURE' => $this->signature,
 			'BUTTONSOURCE' => $this->sBNCode,
 		);
 		$nvp = array_merge($nvp, $additionalNvp);
