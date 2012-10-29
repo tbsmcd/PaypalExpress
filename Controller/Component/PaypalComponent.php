@@ -59,7 +59,7 @@ class PaypalComponent extends Component {
 		$ack = strtoupper($res['ACK']);
 		if ($ack === 'SUCCESS' || $ack === 'SUCCESSWITHWARNING') {
 			$this->Session->write('Paypal.payerId', $res['PAYERID']);
-			$this->Session->write('Paypal.customer', $this->Paypal->fixCustomerData($res, $token));
+			$this->Session->write('Paypal.customer', $this->fixCustomerData($res, $token));
 			return $this->fixCustomerData($res, $token);
 		}
 		return false;
