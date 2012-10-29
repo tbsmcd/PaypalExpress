@@ -7,6 +7,7 @@ class PaypalComponent extends Component {
 	public $paypalUrl;
 	public $sBNCode = 'PP-ECWizard';
 	public $version = '64';
+	public $components = array('Session');
 
 	// You must set in Controller::beforFilter()
 	public $username;
