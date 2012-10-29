@@ -58,6 +58,7 @@ class PaypalComponent extends Component {
 		$res = $this->getShippingDetails($token);
 		$ack = strtoupper($res['ACK']);
 		if ($ack === 'SUCCESS' || $ack === 'SUCCESSWITHWARNING') {
+			$this->Session->write('Paypal.payerId', $res['PAYERID']);
 			return $this->fixCustomerData($res, $token);
 		}
 		return false;
