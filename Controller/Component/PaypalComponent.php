@@ -14,7 +14,7 @@ class PaypalComponent extends Component {
 	public $signature;
 	public $sandboxflag;
 	public $currency;
-	public $pymentType;
+	public $paymentType;
 	public $returnUrl;
 	public $cancelUrl;
 
