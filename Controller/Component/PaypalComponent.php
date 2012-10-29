@@ -45,8 +45,8 @@ class PaypalComponent extends Component {
 		return false;
 	}
 
-	public function redirectToPaypal($token) {
-		$this->controller->redirect($this->paypalUrl . $token);
+	public function paypalUrl($token) {
+		return $this->paypalUrl . $token;
 	}
 
 	public function review($token = null) {
