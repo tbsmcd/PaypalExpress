@@ -32,12 +32,37 @@ class PaypalComponent extends Component {
 		}
 	}
 
-	public function getToken($amount = null) {
+	/*
+	//
+	//	$products = array(
+	//		0 => array(
+	//			'name' => 'NAME0',
+	//			'number' => 2,
+	//			'description' => 'DESCRIPTION0',
+	//		),
+	//		1 => array(
+	//			'name' => 'NAME1',
+	//			'number' => 1,
+	//		),
+	//		2 => array(
+	//			'name' => 'NAME2',
+	//			'description' => 'DESCRIPTION2',
+	//		),
+	//	);
+	//
+	//	PAYMENTREQUEST_n_DESC along with any 2 parameters
+	//	(L_PAYMENTREQUEST_n_NAMEm, L_PAYMENTREQUEST_n_NUMBERm),
+	//	the order description value does not display.
+	*/
+	public function getToken($amount = null, $products = null) {
 		if (!preg_match('/^[1-9][0-9]*$/', $amount)) {
 			return false;
 		}
+		if (!isset($products[0]['name']) || $products[0]['name'] == '') {
+			$proucts = null;
+		}
 		$this->Session->write('Paypal.amount', $amount);
-		$res = $this->callShortcutExpressCheckout($amount);
+		$res = $this->callShortcutExpressCheckout($amount, $products);
 		$ack = strtoupper($res['ACK']);
 		if ($ack === 'SUCCESS' || $ack === 'SUCCESSWITHWARNING') {
 			return $res['TOKEN'];
@@ -78,7 +103,7 @@ class PaypalComponent extends Component {
 		return false;
 	}
 
-	public function callShortcutExpressCheckout ($paymentAmount) {
+	public function callShortcutExpressCheckout ($paymentAmount, $products = null) {
 		$nvp = array(
 			'PAYMENTREQUEST_0_AMT' => $paymentAmount,
 			'PAYMENTREQUEST_0_PAYMENTACTION' => $this->paymentType,
@@ -86,6 +111,22 @@ class PaypalComponent extends Component {
 			'CANCELURL' => $this->cancelUrl,
 			'PAYMENTREQUEST_0_CURRENCYCODE' => $this->currency,
 		);
+		if (is_array($products)) {
+			$i = 0;
+			foreach ($products as $product) {
+				if (isset($product['name']) && $product['name'] !== '') {
+					$nvp['L_PAYMENTREQUEST_' . $i . '_NAMEm'] = $product['name'];
+				}
+				if (isset($product['number']) && preg_match('/^[1-9][0-9]*$/', $product['number'])) {
+					$nvp['L_PAYMENTREQUEST_' . $i . '_NUMBERm'] = $product['number'];
+				} elseif (!isset($nvp['L_PAYMENTREQUEST_' . $i . '_NAMEm'])) {
+					break;
+				}
+				if (isset($product['description']) && $product['description'] !== '') {
+					$nvp['L_PAYMENTREQUEST_' . $i . '_DESCm'] = $product['description'];
+				}
+			}
+		}
 		return $this->hashCall('setExpressCheckout', $nvp);
 	}
 
