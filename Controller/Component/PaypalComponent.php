@@ -37,15 +37,19 @@ class PaypalComponent extends Component {
 	//	$products = array(
 	//		0 => array(
 	//			'name' => 'NAME0',
-	//			'number' => 2,
+	//			'quanity' => 2,
+	//			'amount' => 100,
 	//			'description' => 'DESCRIPTION0',
 	//		),
 	//		1 => array(
 	//			'name' => 'NAME1',
-	//			'number' => 1,
+	//			'quanity' => 1,
+	//			'amount' => 200,
 	//		),
 	//		2 => array(
 	//			'name' => 'NAME2',
+	//			'quanity' => 1,
+	//			'amount' => 100,
 	//			'description' => 'DESCRIPTION2',
 	//		),
 	//	);
@@ -54,7 +58,7 @@ class PaypalComponent extends Component {
 	//	(L_PAYMENTREQUEST_n_NAMEm, L_PAYMENTREQUEST_n_NUMBERm),
 	//	the order description value does not display.
 	*/
-	public function getToken($amount = null, $products = null) {
+	public function getToken($amount = null, $products = null, $shippingTotal = null) {
 		if (!preg_match('/^[1-9][0-9]*$/', $amount)) {
 			return false;
 		}
@@ -62,7 +66,7 @@ class PaypalComponent extends Component {
 			$proucts = null;
 		}
 		$this->Session->write('Paypal.amount', $amount);
-		$res = $this->callShortcutExpressCheckout($amount, $products);
+		$res = $this->callShortcutExpressCheckout($amount, $products, $shippingTotal);
 		$ack = strtoupper($res['ACK']);
 		if ($ack === 'SUCCESS' || $ack === 'SUCCESSWITHWARNING') {
 			return $res['TOKEN'];
@@ -103,7 +107,7 @@ class PaypalComponent extends Component {
 		return false;
 	}
 
-	public function callShortcutExpressCheckout ($paymentAmount, $products = null) {
+	public function callShortcutExpressCheckout ($paymentAmount, $products = null, $shippingTotal = null) {
 		$nvp = array(
 			'PAYMENTREQUEST_0_AMT' => $paymentAmount,
 			'PAYMENTREQUEST_0_PAYMENTACTION' => $this->paymentType,
@@ -113,13 +117,18 @@ class PaypalComponent extends Component {
 		);
 		if (is_array($products)) {
 			$i = 0;
+			$itemTotal = 0;
 			foreach ($products as $product) {
-				if (isset($product['amount']) && preg_match('/^[0-9]*$/', $product['amount'])) {
-					$nvp['L_PAYMENTREQUEST_0_AMT' . $i] = $product['amount'];
-				}
+				$nvp['L_PAYMENTREQUEST_0_AMT' . $i] = $product['amount'];
 				if (isset($product['name']) && $product['name'] !== '') {
 					$nvp['L_PAYMENTREQUEST_0_NAME' . $i] = $product['name'];
 				}
+				if (isset($product['quanity']) && preg_match('/^[1-9][0-9]*$/', $product['quanity'])) {
+					$nvp['L_PAYMENTREQUEST_0_QTY' . $i] = $product['quanity'];
+				} else {
+					$nvp['L_PAYMENTREQUEST_0_QTY' . $i] = 1;
+				}
+				$itemTotal += $nvp['L_PAYMENTREQUEST_0_AMT' . $i] * $nvp['L_PAYMENTREQUEST_0_QTY' . $i];
 				if (isset($product['number']) && preg_match('/^[1-9][0-9]*$/', $product['number'])) {
 					$nvp['L_PAYMENTREQUEST_0_NUMBER' . $i] = $product['number'];
 				} elseif (!isset($nvp['L_PAYMENTREQUEST_0_NAME' . $i])) {
@@ -130,6 +139,10 @@ class PaypalComponent extends Component {
 				}
 				$i++;
 			}
+			$nvp['PAYMENTREQUEST_0_ITEMAMT'] = $itemTotal;
+		}
+		if (isset($shippingTotal) && preg_match('/^[1-9][0-9]*$/', $shippingTotal)) {
+			$nvp['PAYMENTREQUEST_0_SHIPPINGAMT'] = $shippingTotal;
 		}
 		return $this->hashCall('setExpressCheckout', $nvp);
 	}
