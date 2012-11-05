@@ -58,7 +58,7 @@ class PaypalComponent extends Component {
 	//	(L_PAYMENTREQUEST_n_NAMEm, L_PAYMENTREQUEST_n_NUMBERm),
 	//	the order description value does not display.
 	*/
-	public function getToken($amount = null, $products = null, $shippingTotal = null) {
+	public function getToken($amount = null, $products = null, $charges = null) {
 		if (!preg_match('/^[1-9][0-9]*$/', $amount)) {
 			return false;
 		}
@@ -66,7 +66,7 @@ class PaypalComponent extends Component {
 			$proucts = null;
 		}
 		$this->Session->write('Paypal.amount', $amount);
-		$res = $this->callShortcutExpressCheckout($amount, $products, $shippingTotal);
+		$res = $this->callShortcutExpressCheckout($amount, $products, $charges);
 		$ack = strtoupper($res['ACK']);
 		if ($ack === 'SUCCESS' || $ack === 'SUCCESSWITHWARNING') {
 			return $res['TOKEN'];
@@ -107,7 +107,7 @@ class PaypalComponent extends Component {
 		return false;
 	}
 
-	public function callShortcutExpressCheckout ($paymentAmount, $products = null, $shippingTotal = null) {
+	public function callShortcutExpressCheckout ($paymentAmount, $products = null, $charges = null) {
 		$nvp = array(
 			'PAYMENTREQUEST_0_AMT' => $paymentAmount,
 			'PAYMENTREQUEST_0_PAYMENTACTION' => $this->paymentType,
@@ -141,8 +141,20 @@ class PaypalComponent extends Component {
 			}
 			$nvp['PAYMENTREQUEST_0_ITEMAMT'] = $itemTotal;
 		}
-		if (isset($shippingTotal) && preg_match('/^[1-9][0-9]*$/', $shippingTotal)) {
-			$nvp['PAYMENTREQUEST_0_SHIPPINGAMT'] = $shippingTotal;
+		if (isset($charges['shippingTotal']) && preg_match('/^[1-9][0-9]*$/', $charges['shippingTotal'])) {
+			$nvp['PAYMENTREQUEST_0_SHIPPINGAMT'] = $charges['shippingTotal'];
+		}
+		if (isset($charges['handlingTotal']) && preg_match('/^[1-9][0-9]*$/', $charges['handlingTotal'])) {
+			$nvp['PAYMENTREQUEST_0_HANDLINGAMT'] = $charges['handlingTotal'];
+		}
+		if (isset($charges['taxTotal']) && preg_match('/^[1-9][0-9]*$/', $charges['taxTotal'])) {
+			$nvp['PAYMENTREQUEST_0_TAXAMT'] = $charges['taxTotal'];
+		}
+		if (isset($charges['shippingDisTotal']) && preg_match('/^\-[1-9][0-9]*$/', $charges['shippingDisTotal'])) {
+			$nvp['PAYMENTREQUEST_0_SHIPPINGDISAMT'] = $charges['shippingDisTotal'];
+		}
+		if (isset($charges['insuranceTotal']) && preg_match('/^\-[1-9][0-9]*$/', $charges['insuranceTotal'])) {
+			$nvp['PAYMENTREQUEST_0_INSURANCEAMT'] = $charges['insuranceTotal'];
 		}
 		return $this->hashCall('setExpressCheckout', $nvp);
 	}
