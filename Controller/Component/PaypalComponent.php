@@ -114,17 +114,21 @@ class PaypalComponent extends Component {
 		if (is_array($products)) {
 			$i = 0;
 			foreach ($products as $product) {
+				if (isset($product['amount']) && preg_match('/^[0-9]*$/', $product['amount'])) {
+					$nvp['L_PAYMENTREQUEST_0_AMT' . $i] = $product['amount'];
+				}
 				if (isset($product['name']) && $product['name'] !== '') {
-					$nvp['L_PAYMENTREQUEST_' . $i . '_NAMEm'] = $product['name'];
+					$nvp['L_PAYMENTREQUEST_0_NAME' . $i] = $product['name'];
 				}
 				if (isset($product['number']) && preg_match('/^[1-9][0-9]*$/', $product['number'])) {
-					$nvp['L_PAYMENTREQUEST_' . $i . '_NUMBERm'] = $product['number'];
-				} elseif (!isset($nvp['L_PAYMENTREQUEST_' . $i . '_NAMEm'])) {
+					$nvp['L_PAYMENTREQUEST_0_NUMBER' . $i] = $product['number'];
+				} elseif (!isset($nvp['L_PAYMENTREQUEST_0_NAME' . $i])) {
 					break;
 				}
 				if (isset($product['description']) && $product['description'] !== '') {
-					$nvp['L_PAYMENTREQUEST_' . $i . '_DESCm'] = $product['description'];
+					$nvp['L_PAYMENTREQUEST_0_DESC' . $i] = $product['description'];
 				}
+				$i++;
 			}
 		}
 		return $this->hashCall('setExpressCheckout', $nvp);
