@@ -9,7 +9,55 @@ class PaypalComponent extends Component {
 	public $version = '64';
 	public $components = array('Session');
 
-	// You must set in Controller::beforFilter()
+	// map of params
+	protected $productsMap = array(
+		'name' => array(
+			'field' => 'L_PAYMENTREQUEST_0_NAME',
+		),
+		'description' => array(
+			'field' => 'L_PAYMENTREQUEST_0_DESC',
+		),
+		'number' => array(
+			'field' => 'L_PAYMENTREQUEST_0_NUMBER',
+			'rule' => '/^(0|[1-9][0-9]*)$/',
+		),
+		'amount' => array(
+			'field' => 'L_PAYMENTREQUEST_0_AMT',
+			'rule' => '/^[1-9][0-9]*$/',
+		),
+		'quantity' => array(
+			'field' => 'L_PAYMENTREQUEST_0_QTY',
+			'rule' => '/^[1-9][0-9]*$/',
+		),
+		'quanity' => array(
+			'field' => 'L_PAYMENTREQUEST_0_QTY',
+			'rule' => '/^[1-9][0-9]*$/',
+		),
+	);
+	protected $chargesMap = array(
+		'handlingTotal' => array(
+			'field' => 'PAYMENTREQUEST_0_HANDLINGAMT',
+			'rule' => '/^(0|[1-9][0-9]*)$/',
+		),
+		'shippingDiscount' => array(
+			'field' => 'PAYMENTREQUEST_0_SHIPDISCAMT',
+			'rule' => '/^\-[1-9][0-9]*$/',
+		),
+		'shippingTotal' => array(
+			'field' => 'PAYMENTREQUEST_0_SHIPPINGAMT',
+			'rule' => '/^(0|[1-9][0-9]*)$/',
+		),
+		'insuranceTotal' => array(
+			'field' => 'PAYMENTREQUEST_0_INSURANCEAMT',
+			'rule' => '/^(0|[1-9][0-9]*)$/',
+		),
+		'orderTotal' => array(
+			'field' => 'PAYMENTREQUEST_0_AMT',
+			'rule' => '/^(0|[1-9][0-9]*)$/',
+		),
+	);
+
+	// You must set following params in Controller::beforFilter() .
 	public $username;
 	public $password;
 	public $signature;
@@ -33,40 +81,40 @@ class PaypalComponent extends Component {
 	}
 
 	/*
+	//	example of orders.
 	//
-	//	$products = array(
-	//		0 => array(
+	//	$items = array(
+	//		array(
 	//			'name' => 'NAME0',
-	//			'quanity' => 2,
+	//			'quantity' => 2,
 	//			'amount' => 100,
 	//			'description' => 'DESCRIPTION0',
 	//		),
-	//		1 => array(
+	//		array(
 	//			'name' => 'NAME1',
-	//			'quanity' => 1,
+	//			'quantity' => 1,
 	//			'amount' => 200,
 	//		),
-	//		2 => array(
-	//			'name' => 'NAME2',
-	//			'quanity' => 1,
-	//			'amount' => 100,
-	//			'description' => 'DESCRIPTION2',
-	//		),
+	//	);
+	//	$charges = array(
+	//		'orderTotal' => '300',
+	//		'shippingTotal' => '100',
 	//	);
 	//
 	//	PAYMENTREQUEST_n_DESC along with any 2 parameters
 	//	(L_PAYMENTREQUEST_n_NAMEm, L_PAYMENTREQUEST_n_NUMBERm),
 	//	the order description value does not display.
 	*/
-	public function getToken($amount = null, $products = null, $charges = null) {
+	public function getToken($amount, $products = null, $charges = null) {
 		if (!preg_match('/^[1-9][0-9]*$/', $amount)) {
 			return false;
 		}
 		if (!isset($products[0]['name']) || $products[0]['name'] == '') {
-			$proucts = null;
+			$products = null;
 		}
 		$this->Session->write('Paypal.amount', $amount);
 		$res = $this->callShortcutExpressCheckout($amount, $products, $charges);
+		debug($res);
 		$ack = strtoupper($res['ACK']);
 		if ($ack === 'SUCCESS' || $ack === 'SUCCESSWITHWARNING') {
 			return $res['TOKEN'];
@@ -119,6 +167,9 @@ class PaypalComponent extends Component {
 			$i = 0;
 			$itemTotal = 0;
 			foreach ($products as $product) {
+				$nvp = array_merge($nvp, $this->_convert2Nvp($product, $this->productsMap, $i));
+				$itemTotal += $product['amount'] * $product['quantity'];
+/*
 				$nvp['L_PAYMENTREQUEST_0_AMT' . $i] = $product['amount'];
 				if (isset($product['name']) && $product['name'] !== '') {
 					$nvp['L_PAYMENTREQUEST_0_NAME' . $i] = $product['name'];
@@ -137,10 +188,13 @@ class PaypalComponent extends Component {
 				if (isset($product['description']) && $product['description'] !== '') {
 					$nvp['L_PAYMENTREQUEST_0_DESC' . $i] = $product['description'];
 				}
+ */
 				$i++;
 			}
 			$nvp['PAYMENTREQUEST_0_ITEMAMT'] = $itemTotal;
 		}
+		$nvp = array_merge($nvp, $this->_convert2Nvp($charges, $this->chargesMap));
+/*
 		if (isset($charges['shippingTotal']) && preg_match('/^[1-9][0-9]*$/', $charges['shippingTotal'])) {
 			$nvp['PAYMENTREQUEST_0_SHIPPINGAMT'] = $charges['shippingTotal'];
 		}
@@ -156,6 +210,8 @@ class PaypalComponent extends Component {
 		if (isset($charges['insuranceTotal']) && preg_match('/^\-[1-9][0-9]*$/', $charges['insuranceTotal'])) {
 			$nvp['PAYMENTREQUEST_0_INSURANCEAMT'] = $charges['insuranceTotal'];
 		}
+ */
+		debug($nvp);
 		return $this->hashCall('setExpressCheckout', $nvp);
 	}
 
@@ -243,5 +299,18 @@ class PaypalComponent extends Component {
 		return $paymentResult;
 	}
 
-
+	protected function _convert2Nvp($data, $map, $dataNumber = null) {
+		$nvpArray = array();
+		if (!isset($dataNumber) || !preg_match('/^(0|[1-9][0-9]*)$/', $dataNumber)) {
+			$dataNumber = '';
+		}
+		foreach ($data as $key => $value) {
+			if (isset($map[$key])) {
+				if (!isset($map[$key]['rule']) || (isset($map[$key]['rule']) && preg_match($map[$key]['rule'], $value))) {
+					$nvpArray[$map[$key]['field'] . $dataNumber] = $value;
+				}
+			}
+		}
+		return $nvpArray;
+	}
 }
