@@ -9,7 +9,17 @@ class PaypalComponent extends Component {
 	public $version = '64';
 	public $components = array('Session');
 
-	// map of params
+	// You must set following params in Controller::beforFilter() .
+	public $username;
+	public $password;
+	public $signature;
+	public $sandboxflag;
+	public $currency;
+	public $paymentType;
+	public $returnUrl;
+	public $cancelUrl;
+
+	// map of request params
 	protected $productsMap = array(
 		'name' => array(
 			'field' => 'L_PAYMENTREQUEST_0_NAME',
@@ -57,15 +67,64 @@ class PaypalComponent extends Component {
 		),
 	);
 
-	// You must set following params in Controller::beforFilter() .
-	public $username;
-	public $password;
-	public $signature;
-	public $sandboxflag;
-	public $currency;
-	public $paymentType;
-	public $returnUrl;
-	public $cancelUrl;
+	// map of response fields
+	// https://www.x.com/developers/paypal/documentation-tools/api/getexpresscheckoutdetails-api-operation-nvp
+	protected $addressTypeMap = array(
+		'PAYMENTREQUEST_0_SHIPTONAME' => 'name',
+		'PAYMENTREQUEST_0_SHIPTOSTREET' => 'street',
+		'PAYMENTREQUEST_0_SHIPTOSTREET2' => 'street2',
+		'PAYMENTREQUEST_0_SHIPTOCITY' => 'city',
+		'PAYMENTREQUEST_0_SHIPTOSTATE' => 'state',
+		'PAYMENTREQUEST_0_SHIPTOZIP' => 'zip',
+		'PAYMENTREQUEST_0_SHIPTOCOUNTRYCODE' => 'country',
+		'PAYMENTREQUEST_0_SHIPTOPHONENUM' => 'phone',
+		'PAYMENTREQUEST_0_ADDRESSSTATUS' => 'addressStatus',
+	);
+	protected $paymentDetailsMap = array(
+		'PAYMENTREQUEST_0_AMT' => 'amt',
+		'PAYMENTREQUEST_0_CURRENCYCODE' => 'currency',
+		'PAYMENTREQUEST_0_ITEMAMT' => 'itemAmt',
+		'PAYMENTREQUEST_0_SHIPPINGAMT' => 'shippingAmt',
+		'PAYMENTREQUEST_0_INSURANCEAMT' => 'insuranceAmt',
+		'PAYMENTREQUEST_0_SHIPDISCAMT' => 'shippingDiscountAmt',
+		'PAYMENTREQUEST_0_INSURANCEOPTIONOFFERED' => 'insuranceOptionOffered',
+		'PAYMENTREQUEST_0_HANDLINGAMT' => 'handlingAmt',
+		'PAYMENTREQUEST_0_TAXAMT' => 'taxAmt',
+		'PAYMENTREQUEST_0_DESC' => 'description',
+		'PAYMENTREQUEST_0_CUSTOM' => 'custom',
+		'PAYMENTREQUEST_0_INVNUM' => 'invNumber',
+		'PAYMENTREQUEST_0_NOTIFYURL' => 'notifyUrl',
+		'PAYMENTREQUEST_0_NOTETEXT' => 'noteText',
+		'PAYMENTREQUEST_0_TRANSACTIONID' => 'transactionId',
+		'PAYMENTREQUEST_0_ALLOWEDPAYMENTMETHOD' => 'allowPaymentMethod',
+		'PAYMENTREQUEST_0_PAYMENTREQUESTID' => 'paymentRequestId',
+	);
+
+	// https://www.x.com/developers/paypal/documentation-tools/api/doexpresscheckoutpayment-api-operation-nvp
+	protected $paymentInfomationMap = array(
+		'PAYMENTINFO_0_TRANSACTIONID' => 'transactionId',
+		'PAYMENTINFO_0_TRANSACTIONTYPE' => 'transactionType',
+		'PAYMENTINFO_0_PAYMENTTYPE' => 'paymentType',
+		'PAYMENTINFO_0_ORDERTIME' => 'orderTime',
+		'PAYMENTINFO_0_AMT' => 'amt',
+		'PAYMENTINFO_0_CURRENCYCODE' => 'currencyCode',
+		'PAYMENTINFO_0_FEEAMT' => 'feeAmt',
+		'PAYMENTINFO_0_SETTLEAMT' => 'settleAmt',
+		'PAYMENTINFO_0_TAXAMT' => 'taxAmt',
+		'PAYMENTINFO_0_EXCHANGERATE' => 'exchangeRate',
+		'PAYMENTINFO_0_PAYMENTSTATUS' => 'paymentStatus',
+		'PAYMENTINFO_0_PENDINGREASON' => 'pendingReason',
+		'PAYMENTINFO_0_REASONCODE' => 'reasonCode',
+		'PAYMENTINFO_0_HOLDDECISION' => 'holdDecision',
+		'PAYMENTINFO_0_PROTECTIONELIGIBILITY' => 'protectionEligibility',
+		'PAYMENTINFO_0_PROTECTIONELIGIBILITYTYPE' => 'protectionEligibilityType',
+		'STOREID' => 'storeId',
+		'TERMINALID' => 'terminalId',
+		'PAYMENTINFO_0_EBAYITEMAUCTIONTXNID' => 'ebayItemAuctionTxnId',
+		'PAYMENTINFO_0_PAYMENTREQUESTID' => 'paymentRequestId',
+	);
+
+
 
 	public function startup($controller) {
 		if ($this->sandboxFlag === true) {
@@ -135,8 +194,10 @@ class PaypalComponent extends Component {
 		$ack = strtoupper($res['ACK']);
 		if ($ack === 'SUCCESS' || $ack === 'SUCCESSWITHWARNING') {
 			$this->Session->write('Paypal.payerId', $res['PAYERID']);
-			$this->Session->write('Paypal.customer', $this->fixCustomerData($res, $token));
-			return $this->fixCustomerData($res, $token);
+			$map = array_merge($this->addressTypeMap, $this->paymentDetailsMap, array('EMAIL' => 'email'));
+			$paymentResult = $this->_fixResults($token, $res, $map);
+			$this->Session->write('Paypal.customer', $paymentResult);
+			return $paymentResult;
 		}
 		return false;
 	}
@@ -148,7 +209,7 @@ class PaypalComponent extends Component {
 		$res = $this->confirmPayment($amount, $token, $payerId);
 		$ack = strtoupper($res['ACK']);
 		if ($ack === 'SUCCESS' || $ack === 'SUCCESSWITHWARNING') {
-			$paymentResult = $this->fixPaymentResult($res, $token);
+			$paymentResult = $this->_fixResults($token, $res, $this->paymentInfomationMap);
 			return $paymentResult;
 		}
 		return false;
@@ -173,14 +234,14 @@ class PaypalComponent extends Component {
 			$nvp['PAYMENTREQUEST_0_ITEMAMT'] = $itemTotal;
 		}
 		$nvp = array_merge($nvp, $this->_convert2Nvp($charges, $this->chargesMap));
-		return $this->hashCall('setExpressCheckout', $nvp);
+		return $this->_hashCall('setExpressCheckout', $nvp);
 	}
 
 	public function getShippingDetails($token) {
 		$nvp = array(
 			'TOKEN' => $token,
 		);
-		$details = $this->hashCall('GetExpressCheckoutDetails', $nvp);
+		$details = $this->_hashCall('GetExpressCheckoutDetails', $nvp);
 		return $details;
 	}
 
@@ -193,10 +254,10 @@ class PaypalComponent extends Component {
 			'PAYMENTREQUEST_0_CURRENCYCODE' => $this->currency,
 			'IPADDRESS' => env('SERVER_NAME'),
 		);
-		return $this->hashCall('DoExpressCheckoutPayment', $nvp);
+		return $this->_hashCall('DoExpressCheckoutPayment', $nvp);
 	}
 
-	public function hashCall ($methodName, $additionalNvp) {
+	protected function _hashCall($methodName, $additionalNvp) {
 		$nvp = array(
 			'METHOD' => $methodName,
 			'VERSION' => $this->version,
@@ -212,54 +273,6 @@ class PaypalComponent extends Component {
 		return $body;
 	}
 
-	public function	fixCustomerData($data, $token) {
-		$customer = array(
-			'token' => $token,
-			'name' => $data['SHIPTONAME'],
-			'email' => $data['EMAIL'],
-			'street' => $data['SHIPTOSTREET'],
-			'city' => $data['SHIPTOCITY'],
-			'state' => $data['SHIPTOSTATE'],
-			'zip' => $data['SHIPTOZIP'],
-			'country' => $data['SHIPTOCOUNTRYNAME'],
-			'currency' => $data['CURRENCYCODE'],
-			'amt' => $data['AMT'],
-			'shippingAmt' => $data['SHIPPINGAMT'],
-			'taxAmt' => $data['TAXAMT'],
-			'insuranceAmt' => $data['INSURANCEAMT'],
-			'shiopdiscAmt' => $data['SHIPDISCAMT'],
-		);
-		return $customer;
-	}
-
-	public function fixPaymentResult($data, $token) {
-		$paymentResult = array(
-			'token' => $token,
-			'transactionId' => $data['PAYMENTINFO_0_TRANSACTIONID'],
-			'transactionType' => $data['PAYMENTINFO_0_TRANSACTIONTYPE'],
-			'paymentType' => $data['PAYMENTINFO_0_PAYMENTTYPE'],
-			'orderTime' => $data['PAYMENTINFO_0_ORDERTIME'],
-			'amt' => $data['PAYMENTINFO_0_AMT'],
-			'currencyCode' => $data['PAYMENTINFO_0_CURRENCYCODE'],
-			'paymentStatus' => $data['PAYMENTINFO_0_PAYMENTSTATUS'],
-			'pendingReason' => $data['PAYMENTINFO_0_PENDINGREASON'],
-			'pandingReason' => $data['PAYMENTINFO_0_REASONCODE'],
-		);
-		if (isset($data['PAYMENTINFO_0_TAXAMT'])) {
-			$paymentResult['taxAmt'] = $data['PAYMENTINFO_0_TAXAMT'];
-		}
-		if (isset($data['PAYMENTINFO_0_FEEAMT'])) {
-			$paymentResult['feeAmt'] = $data['PAYMENTINFO_0_FEEAMT'];
-		}
-		if (isset($data['PAYMENTINFO_0_EXCHANGERATE'])) {
-			$paymentResult['exchangeRate'] = $data['PAYMENTINFO_0_EXCHANGERATE'];
-		}
-		if (isset($data['PAYMENTINFO_0_SETTLEAMT'])) {
-			$paymentResult['settleAmt'] = $data['PAYMENTINFO_0_SETTLEAMT'];
-		}
-		return $paymentResult;
-	}
-
 	protected function _convert2Nvp($data, $map, $dataNumber = null) {
 		$nvpArray = array();
 		if (!isset($dataNumber) || !preg_match('/^(0|[1-9][0-9]*)$/', $dataNumber)) {
@@ -273,5 +286,16 @@ class PaypalComponent extends Component {
 			}
 		}
 		return $nvpArray;
+	}
+
+	protected function _fixResults($token, $data, $map) {
+		$fixed = array();
+		$fixed['token'] = $token;
+		foreach ($data as $key => $value) {
+			if (isset($map[$key])) {
+				$fixed[$map[$key]] = $value;
+			}
+		}
+		return $fixed;
 	}
 }
