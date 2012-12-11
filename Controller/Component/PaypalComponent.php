@@ -39,10 +39,6 @@ class PaypalComponent extends Component {
 			'field' => 'L_PAYMENTREQUEST_0_QTY',
 			'rule' => '/^[1-9][0-9]*$/',
 		),
-		'quanity' => array(
-			'field' => 'L_PAYMENTREQUEST_0_QTY',
-			'rule' => '/^[1-9][0-9]*$/',
-		),
 	);
 	protected $chargesMap = array(
 		'handlingTotal' => array(
