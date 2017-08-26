@@ -19,6 +19,9 @@ class PaypalComponent extends Component {
 	public $returnUrl;
 	public $cancelUrl;
 
+	// for error logging
+	private $errors = array();
+
 	// map of request params
 	protected $productsMap = array(
 		'name' => array(
@@ -120,8 +123,6 @@ class PaypalComponent extends Component {
 		'PAYMENTINFO_0_PAYMENTREQUESTID' => 'paymentRequestId',
 	);
 
-
-
 	public function startup($controller) {
 		if ($this->sandboxFlag === true) {
 			$this->apiEndpoint = 'https://api-3t.sandbox.paypal.com/nvp';
@@ -133,6 +134,10 @@ class PaypalComponent extends Component {
 		if (false === CakeSession::started()) {
 			CakeSession::start();
 		}
+	}
+
+	public function getErrors() {
+		return $this->errors;
 	}
 
 	/*
@@ -207,6 +212,9 @@ class PaypalComponent extends Component {
 		if ($ack === 'SUCCESS' || $ack === 'SUCCESSWITHWARNING') {
 			$paymentResult = $this->_fixResults($token, $res, $this->paymentInfomationMap);
 			return $paymentResult;
+		} else {
+			$this->errors['payer_id'] = $payerId;
+			$this->errors['finish_checkout'] = $res;
 		}
 		return false;
 	}
